@@ -15,7 +15,7 @@ XIAOMI_CONTROLLER = 'Xiaomi'
 MQTT_CONTROLLER = 'MQTT'
 LOOKIN_CONTROLLER = 'LOOKin'
 ESPHOME_CONTROLLER = 'ESPHome'
-ZHA_CONTROLLER = 'zha'
+ZHA_CONTROLLER = 'ZHA'
 
 ENC_BASE64 = 'Base64'
 ENC_HEX = 'Hex'
@@ -27,6 +27,7 @@ XIAOMI_COMMANDS_ENCODING = [ENC_PRONTO, ENC_RAW]
 MQTT_COMMANDS_ENCODING = [ENC_RAW]
 LOOKIN_COMMANDS_ENCODING = [ENC_PRONTO, ENC_RAW]
 ESPHOME_COMMANDS_ENCODING = [ENC_RAW]
+ZHA_COMMANDS_ENCODING = [ENC_RAW]
 
 
 def get_controller(hass, controller, encoding, controller_data, delay):
@@ -37,7 +38,7 @@ def get_controller(hass, controller, encoding, controller_data, delay):
         MQTT_CONTROLLER: MQTTController,
         LOOKIN_CONTROLLER: LookinController,
         ESPHOME_CONTROLLER: ESPHomeController,
-        ZHA_CONTROLLER: ZhaController
+        ZHA_CONTROLLER: ZHAController
     }
     try:
         return controllers[controller](hass, controller, encoding, controller_data, delay)
@@ -188,25 +189,39 @@ class ESPHomeController(AbstractController):
             'esphome', self._controller_data, service_data)
 
 
-class ZhaController(AbstractController):
-    """Controls a ZHA device."""
+class ZHAController(AbstractController):
+    """Controls a Zigbee Home Automation (ZHA) device."""
 
     def check_encoding(self, encoding):
         """Check if the encoding is supported by the controller."""
-        if encoding not in ESPHOME_COMMANDS_ENCODING:
+        if encoding not in ZHA_COMMANDS_ENCODING:
             raise Exception("The encoding is not supported "
-                            "by the ESPHome controller.")
+                            "by the ZHA controller.")
 
+    # async def send(self, command):
+    #     """Send a command."""
+    #     service_data = json.loads(self._controller_data)
+    #     if not isinstance(service_data, dict):
+    #         raise Exception("Wrong json config for ZHA controller")
+    #     for k in ['ieee', 'endpoint_id', 'cluster_id', 'cluster_type', 'command']:
+    #         if not service_data.get(k):
+    #             raise Exception(f"Missing {k} parameter in config for ZHA controller")
+    #     service_data['params'] = {
+    #         'code': command,
+    #     }
+
+    # used extract from here instead https://github.com/davidrpfarinha/SmartIR/blob/master/custom_components/smartir/controller.py
     async def send(self, command):
         """Send a command."""
-        service_data = json.loads(self._controller_data)
-        if not isinstance(service_data, dict):
-            raise Exception("Wrong json config for ZHA controller")
-        for k in ['ieee', 'endpoint_id', 'cluster_id', 'cluster_type', 'command']:
-            if not service_data.get(k):
-                raise Exception(f"Missing {k} parameter in config for ZHA controller")
-        service_data['params'] = {
-            'code': command,
+        service_data = {
+            'cluster_type': 'in',
+            'endpoint_id': '1',
+            'command': '2',
+            'ieee': self._controller_data,
+            'command_type': 'server',
+            'params': { 'code': command},
+            'cluster_id': '57348'
         }
+
         await self.hass.services.async_call(
             'zha', 'issue_zigbee_cluster_command', service_data)
